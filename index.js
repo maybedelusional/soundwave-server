@@ -42,6 +42,13 @@ db.serialize(() => {
   )`);
   // Migrations
   db.run(`ALTER TABLE songs ADD COLUMN uploaded_by TEXT DEFAULT 'Unknown'`, () => {});
+  db.run(`CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY,
+    song_id TEXT NOT NULL,
+    username TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`);
   db.run(`ALTER TABLE songs ADD COLUMN play_count INTEGER DEFAULT 0`, () => {});
   db.run(`ALTER TABLE songs ADD COLUMN duration REAL DEFAULT 0`, () => {});
 });
@@ -286,6 +293,36 @@ app.post("/avatar", (req, res) => {
     ON CONFLICT(username) DO UPDATE SET avatar_color=?`,
     [username, new Date().toISOString(), avatarColor, avatarColor]);
   res.json({ success: true });
+});
+
+
+// GET comments for a song
+app.get("/songs/:id/comments", (req, res) => {
+  db.all("SELECT * FROM comments WHERE song_id=? ORDER BY created_at ASC",
+    [req.params.id], (err, rows) => res.json(rows || []));
+});
+
+// POST a comment
+app.post("/songs/:id/comments", (req, res) => {
+  const { username, text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: "Empty comment" });
+  const id = uuidv4();
+  db.run("INSERT INTO comments (id,song_id,username,text,created_at) VALUES (?,?,?,?,?)",
+    [id, req.params.id, username, text.trim(), new Date().toISOString()],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      logEvent(`${username} commented on a song`);
+      res.json({ id, song_id: req.params.id, username, text: text.trim(), created_at: new Date().toISOString() });
+    }
+  );
+});
+
+// DELETE a comment
+app.delete("/comments/:id", (req, res) => {
+  db.run("DELETE FROM comments WHERE id=? AND username=?",
+    [req.params.id, req.body.username],
+    (err) => { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }
+  );
 });
 
 app.listen(PORT, () => console.log(`Soundwave server running at http://localhost:${PORT}`));
