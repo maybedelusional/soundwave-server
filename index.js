@@ -7,7 +7,7 @@ const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 const DATA_DIR = process.env.SERVER_DATA_PATH || path.join(__dirname, "data");
 const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
